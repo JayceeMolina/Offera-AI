@@ -47,6 +47,14 @@ export async function POST(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
+  // Ensure NEXT_PUBLIC_SITE_URL is configured so confirmation emails have a valid redirect
+  if (!process.env.NEXT_PUBLIC_SITE_URL) {
+    return NextResponse.json(
+      { error: 'Server misconfiguration: site URL is not set. Please contact support.' },
+      { status: 500 }
+    )
+  }
+
   // Check if email already exists
   const { data: existingUser } = await supabase
     .from('auth.users')
