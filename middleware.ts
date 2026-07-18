@@ -40,6 +40,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
+  // Prevent browser from caching protected pages (fixes back button after logout)
+  if (
+    request.nextUrl.pathname.startsWith('/dashboard') ||
+    request.nextUrl.pathname.startsWith('/ai')
+  ) {
+    supabaseResponse.headers.set(
+      'Cache-Control',
+      'no-store, no-cache, must-revalidate, proxy-revalidate'
+    )
+    supabaseResponse.headers.set('Pragma', 'no-cache')
+    supabaseResponse.headers.set('Expires', '0')
+  }
+
   return supabaseResponse
 }
 

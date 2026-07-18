@@ -99,13 +99,28 @@ export default function AIToolsPage() {
   const router = useRouter()
   const supabase = createClient()
   useInactivityLogout()
-  // Prevent browser back/forward after logout
+
+  // Redirect to login if no authenticated user (handles bfcache restores via pageshow)
   useEffect(() => {
-    window.history.replaceState(null, '', window.location.href)
-    window.onpopstate = () => {
-      window.history.replaceState(null, '', window.location.href)
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.replace('/login')
+      }
     }
-    return () => { window.onpopstate = null }
+
+    checkAuth()
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        checkAuth()
+      }
+    }
+
+    window.addEventListener('pageshow', handlePageShow)
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow)
+    }
   }, [])
 
   const handleLogout = async () => {
