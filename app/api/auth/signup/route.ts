@@ -54,7 +54,13 @@ export async function POST(request: NextRequest) {
     .eq('email', email)
     .maybeSingle()
 
-  const { data, error } = await supabase.auth.signUp({ email, password })
+  const emailRedirectTo = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: { emailRedirectTo },
+  })
 
   if (error) {
     // Supabase returns a specific message for duplicate emails
