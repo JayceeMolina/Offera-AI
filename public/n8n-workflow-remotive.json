@@ -1,0 +1,164 @@
+{
+  "name": "Offera AI - Auto Import Jobs (Remotive)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 12 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [250, 300],
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "url": "https://remotive.com/api/remote-jobs?category=software-dev&limit=30",
+        "options": {}
+      },
+      "id": "fetch-remotive",
+      "name": "Fetch Remotive Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [480, 300],
+      "typeVersion": 4.2
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// CUSTOMIZE YOUR KEYWORDS HERE\n// Only jobs whose title contains one of these words will be imported.\n// Change these to match the roles you're looking for.\n// ============================================================\nconst keywords = [\n  'frontend',\n  'react',\n  'next.js',\n  'full stack',\n  'typescript',\n  'web developer',\n  'software engineer'\n];\n// ============================================================\n\nconst jobs = $input.first().json.jobs || [];\n\nconst filtered = jobs.filter(job => {\n  const title = job.title.toLowerCase();\n  return keywords.some(kw => title.includes(kw.toLowerCase()));\n});\n\nif (filtered.length === 0) {\n  return [{ json: { _skip: true, message: 'No matching jobs found this cycle.' } }];\n}\n\n// Map to Offera AI job_applications schema.\n// Each job links back to Remotive and credits them as the source.\nreturn filtered.map(job => ({\n  json: {\n    company_name: job.company_name || 'Unknown',\n    job_title: job.title,\n    job_description: (job.description || '').replace(/<[^>]*>/g, '').slice(0, 2000),\n    job_url: job.url,\n    status: 'applied',\n    applied_date: new Date().toISOString().split('T')[0],\n    notes: 'Source: Remotive (remotive.com). ' + (job.salary ? 'Salary: ' + job.salary : 'Salary not listed.'),\n    salary: job.salary || '',\n    location: job.candidate_required_location || 'Remote',\n    work_setup: 'WFH',\n    work_hours: job.job_type || 'full_time'\n  }\n}));"
+      },
+      "id": "filter-and-map",
+      "name": "Filter and Map Jobs",
+      "type": "n8n-nodes-base.code",
+      "position": [720, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
+          "conditions": [
+            {
+              "id": "skip-check",
+              "leftValue": "={{ $json._skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "skip-if-empty",
+      "name": "Skip if Empty",
+      "type": "n8n-nodes-base.if",
+      "position": [960, 300],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "YOUR_SUPABASE_URL/rest/v1/job_applications",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_ANON_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_ANON_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=ignore-duplicates,return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ ...$json, user_id: 'YOUR_USER_UUID' }) }}"
+      },
+      "id": "insert-to-supabase",
+      "name": "Insert to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1200, 250],
+      "typeVersion": 4.2
+    }
+  ],
+  "connections": {
+    "Every 12 Hours": {
+      "main": [
+        [
+          {
+            "node": "Fetch Remotive Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Remotive Jobs": {
+      "main": [
+        [
+          {
+            "node": "Filter and Map Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter and Map Jobs": {
+      "main": [
+        [
+          {
+            "node": "Skip if Empty",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip if Empty": {
+      "main": [
+        [
+          {
+            "node": "Insert to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "Offera AI"
+    }
+  ]
+}
