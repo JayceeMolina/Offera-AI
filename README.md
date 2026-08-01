@@ -103,6 +103,34 @@ Open http://localhost:3000
 
 ---
 
+## Docker
+
+You can run Offera AI in a Docker container for consistent, portable deployments.
+
+### Quick Start with Docker Compose
+
+    docker compose up --build
+
+Open http://localhost:3000
+
+### Manual Docker Build
+
+    # Build the image
+    docker build -t offera-ai .
+
+    # Run the container
+    docker run -p 3000:3000 --env-file .env.local offera-ai
+
+### Docker Architecture
+
+- **Multi-stage build** — 3 stages (deps → build → production) for minimal image size (~150MB)
+- **Alpine Linux** — lightweight base image with reduced attack surface
+- **Non-root user** — container runs as unprivileged user for security
+- **Standalone output** — Next.js standalone mode for optimized production builds
+- **Health checks** — built-in container health monitoring via Docker Compose
+
+---
+
 ## Automation (n8n + Remotive)
 
 Offera AI includes an optional automation feature that lets users auto-import remote job listings from [Remotive](https://remotive.com) into their dashboard using [n8n](https://n8n.io) (free, self-hosted).
