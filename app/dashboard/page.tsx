@@ -455,6 +455,11 @@ export default function DashboardPage() {
           >
             🤖 AI Tools
           </button>
+          <button onClick={() => router.push('/automation')}
+            className="hidden lg:block text-sm px-4 py-2 rounded-lg border border-[#D9D4CB] dark:border-slate-700 text-[#4A4540] dark:text-slate-300 hover:bg-[#E8E4DC] dark:hover:bg-slate-800 transition-colors whitespace-nowrap font-medium"
+          >
+            ⚡ Automation
+          </button>
           <button onClick={() => setShowNewJobModal(true)}
             className="text-sm px-3 lg:px-5 py-2 rounded-lg font-semibold text-white whitespace-nowrap transition-colors bg-[#8B3A2A] hover:bg-[#7A3224] dark:bg-indigo-600 dark:hover:bg-indigo-700"
           >
@@ -572,6 +577,12 @@ export default function DashboardPage() {
             className="text-sm text-[#A8A099] dark:text-slate-500 hover:text-[#1E1915] dark:hover:text-slate-100 transition-colors"
           >
             🤖 AI Tools
+          </button>
+          <button
+            onClick={() => router.push('/automation')}
+            className="text-sm text-[#A8A099] dark:text-slate-500 hover:text-[#1E1915] dark:hover:text-slate-100 transition-colors"
+          >
+            ⚡ Auto
           </button>
           <button
             onClick={handleLogout}
