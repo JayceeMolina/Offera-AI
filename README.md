@@ -2,7 +2,7 @@
 
 A full-stack AI-powered job application tracking platform built with Next.js, TypeScript, and Supabase.
 
-🔗 **Live Demo:** [your-url.vercel.app](offera-ai.vercel.app)
+🔗 **Live Demo:** [your-url.vercel.app](https://offera-ai.vercel.app/)
 
 ---
 
