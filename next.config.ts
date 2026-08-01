@@ -8,6 +8,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Produces a standalone build for Docker deployment
+  output: "standalone",
   // Hides source code from browser devtools in production
   productionBrowserSourceMaps: false,
   headers: async () => [
