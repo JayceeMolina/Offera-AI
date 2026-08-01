@@ -16,6 +16,7 @@ A full-stack AI-powered job application tracking platform built with Next.js, Ty
 - 🔍 **Search & Filter** — search across all applications instantly
 - 🌙 **Dark Mode** — full light/dark mode support
 - 📊 **Response Rate Tracker** — see your interview success rate at a glance
+- ⚡ **Job Automation** — auto-import remote job listings from Remotive using n8n (self-hosted, free)
 
 ---
 
@@ -27,6 +28,7 @@ A full-stack AI-powered job application tracking platform built with Next.js, Ty
 | Backend | Next.js API Routes, Supabase PostgreSQL |
 | Auth | Supabase Auth (JWT) |
 | AI | Google Gemini API |
+| Automation | n8n (self-hosted), Remotive API |
 | Containerization | Docker (multi-stage build) |
 | Deployment | Vercel / Docker |
 
@@ -129,11 +131,34 @@ Open http://localhost:3000
 
 ---
 
+## Automation (n8n + Remotive)
+
+Offera AI includes an optional automation feature that lets users auto-import remote job listings from [Remotive](https://remotive.com) into their dashboard using [n8n](https://n8n.io) (free, self-hosted).
+
+### How It Works
+
+1. User runs n8n locally via Docker
+2. Imports the pre-built workflow (`public/n8n-workflow-remotive.json`)
+3. n8n fetches jobs from Remotive on a schedule → filters by keywords → inserts into Supabase
+4. Jobs appear automatically in the user's dashboard
+
+### Key Points
+
+- **Free** — n8n Community Edition is open-source, Remotive API is public
+- **Private** — runs on the user's own machine, no server-side scraping
+- **Legal** — complies with Remotive ToS (links back to source, personal use only)
+- **No duplicates** — unique index on `(user_id, job_url)` prevents re-imports
+
+Visit the `/automation` page in the app for the full setup guide.
+
+---
+
 ## Project Structure
 
     offera-ai/
     ├── app/
     │   ├── api/ai/        # AI API route (Google Gemini)
+    │   ├── automation/    # n8n automation setup guide
     │   ├── dashboard/     # Main Kanban dashboard
     │   ├── ai/            # AI tools page
     │   ├── login/         # Auth page
@@ -143,6 +168,8 @@ Open http://localhost:3000
     │   ├── ratelimit.ts   # Rate limiting
     │   ├── sanitize.ts    # Input sanitization
     │   └── useInactivityLogout.ts  # Session timeout
+    ├── public/
+    │   └── n8n-workflow-remotive.json  # Pre-built n8n workflow
     ├── Dockerfile         # Multi-stage production build
     ├── docker-compose.yml # Local Docker development
     ├── .dockerignore      # Docker build exclusions

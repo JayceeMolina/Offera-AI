@@ -42,7 +42,7 @@ export default function PrivacyPage() {
 
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-[#1E1915] dark:text-slate-100">Privacy Policy</h1>
-            <p className="text-[#A8A099] dark:text-slate-400 mt-2 text-sm">Last updated: June 2026</p>
+            <p className="text-[#A8A099] dark:text-slate-400 mt-2 text-sm">Last updated: August 2026</p>
           </div>
 
           {[
@@ -56,30 +56,38 @@ export default function PrivacyPage() {
             },
             {
               title: '3. AI Tools',
-              content: "When you use AI tools, your input is sent to OpenRouter's API to generate a response. We do not store your AI inputs or outputs permanently. OpenRouter's privacy policy applies to data processed through their service.",
+              content: "When you use AI tools, your input is sent to Google's Gemini API to generate a response. We do not store your AI inputs or outputs permanently. Google's privacy policy applies to data processed through their service.",
             },
             {
-              title: '4. Data Storage',
+              title: '4. Automation (n8n + Remotive)',
+              content: 'Offera AI offers an optional automation feature that allows you to auto-import remote job listings from Remotive into your dashboard using n8n. This automation runs entirely on your own machine — Offera AI\'s servers never access Remotive\'s API on your behalf. Your Supabase credentials are stored locally in your n8n instance and are never transmitted to or stored by Offera AI. Job data imported via automation is stored in your personal database and subject to the same Row Level Security protections as manually entered data.',
+            },
+            {
+              title: '5. Data Storage',
               content: 'Your data is stored securely in PostgreSQL. Each user can only access their own data — enforced at the database level using Row Level Security. Passwords are hashed and never stored in plain text.',
             },
             {
-              title: '5. Cookies & Sessions',
+              title: '6. Cookies & Sessions',
               content: 'We use session cookies to keep you logged in. Sessions automatically expire after 30 minutes of inactivity. We do not use tracking or advertising cookies.',
             },
             {
-              title: '6. Data Deletion',
+              title: '7. Data Deletion',
               content: 'You can delete any job application at any time from your dashboard. To request full account deletion including your email and all data, contact us and we will process it within 7 days.',
             },
             {
-              title: '7. Security',
+              title: '8. Security',
               content: 'We implement industry-standard security practices including JWT authentication, rate limiting, input sanitization, HTTP security headers, and encrypted data transmission.',
             },
             {
-              title: '8. Changes to This Policy',
+              title: '9. Third-Party Services',
+              content: 'Offera AI integrates with the following third-party services: Supabase (database and authentication), Google Gemini (AI text generation), and optionally Remotive (job listings via user-initiated automation). Each service has its own privacy policy. We only share the minimum data required for each service to function.',
+            },
+            {
+              title: '10. Changes to This Policy',
               content: 'We may update this policy occasionally. Continued use of Offera AI after changes means you accept the updated policy.',
             },
             {
-              title: '9. Contact',
+              title: '11. Contact',
               content: 'For any privacy concerns or data deletion requests, please reach out via the contact information on our GitHub repository.',
             },
           ].map((section) => (
