@@ -23,11 +23,12 @@ A full-stack AI-powered job application tracking platform built with Next.js, Ty
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 15, React, TypeScript, Tailwind CSS |
+| Frontend | Next.js 16, React, TypeScript, Tailwind CSS |
 | Backend | Next.js API Routes, Supabase PostgreSQL |
 | Auth | Supabase Auth (JWT) |
-| AI | OpenRouter API (free tier) |
-| Deployment | Vercel |
+| AI | Google Gemini API |
+| Containerization | Docker (multi-stage build) |
+| Deployment | Vercel / Docker |
 
 ---
 
@@ -100,11 +101,39 @@ Open http://localhost:3000
 
 ---
 
+## Docker
+
+You can run Offera AI in a Docker container for consistent, portable deployments.
+
+### Quick Start with Docker Compose
+
+    docker compose up --build
+
+Open http://localhost:3000
+
+### Manual Docker Build
+
+    # Build the image
+    docker build -t offera-ai .
+
+    # Run the container
+    docker run -p 3000:3000 --env-file .env.local offera-ai
+
+### Docker Architecture
+
+- **Multi-stage build** — 3 stages (deps → build → production) for minimal image size (~150MB)
+- **Alpine Linux** — lightweight base image with reduced attack surface
+- **Non-root user** — container runs as unprivileged user for security
+- **Standalone output** — Next.js standalone mode for optimized production builds
+- **Health checks** — built-in container health monitoring via Docker Compose
+
+---
+
 ## Project Structure
 
     offera-ai/
     ├── app/
-    │   ├── api/ai/        # AI API route (OpenRouter)
+    │   ├── api/ai/        # AI API route (Google Gemini)
     │   ├── dashboard/     # Main Kanban dashboard
     │   ├── ai/            # AI tools page
     │   ├── login/         # Auth page
@@ -114,7 +143,10 @@ Open http://localhost:3000
     │   ├── ratelimit.ts   # Rate limiting
     │   ├── sanitize.ts    # Input sanitization
     │   └── useInactivityLogout.ts  # Session timeout
-    └── next.config.ts     # Security headers
+    ├── Dockerfile         # Multi-stage production build
+    ├── docker-compose.yml # Local Docker development
+    ├── .dockerignore      # Docker build exclusions
+    └── next.config.ts     # Security headers + standalone output
 
 ---
 
