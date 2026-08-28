@@ -11,9 +11,11 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useTheme } from 'next-themes'
+import { getPasswordStrength } from '@/lib/password'
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme()
@@ -30,25 +32,8 @@ function ThemeToggle() {
   )
 }
 
-// Password strength checker
-function getPasswordStrength(password: string): {
-  score: number
-  label: string
-  color: string
-  checks: { label: string; passed: boolean }[]
-} {
-  const checks = [
-    { label: 'At least 8 characters', passed: password.length >= 8 },
-    { label: 'One uppercase letter', passed: /[A-Z]/.test(password) },
-    { label: 'One lowercase letter', passed: /[a-z]/.test(password) },
-    { label: 'One number', passed: /[0-9]/.test(password) },
-    { label: 'One special character (!@#$%...)', passed: /[^A-Za-z0-9]/.test(password) },
-  ]
-  const score = checks.filter(c => c.passed).length
-  const label = score <= 1 ? 'Weak' : score <= 3 ? 'Fair' : score === 4 ? 'Good' : 'Strong'
-  const color = score <= 1 ? 'bg-rose-500' : score <= 3 ? 'bg-amber-500' : score === 4 ? 'bg-blue-500' : 'bg-emerald-500'
-  return { score, label, color, checks }
-}
+// The password policy now lives in @/lib/password so that signup, the signup
+// API route and the reset page all enforce exactly the same rules.
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -68,8 +53,9 @@ export default function LoginPage() {
     setMessage('')
 
     if (isSignUp) {
-      // Client-side password validation before hitting API
-      if (strength.score < 5) {
+      // Client-side pre-check for fast feedback. The API route re-validates
+      // with the same shared policy, which is where enforcement actually is.
+      if (!strength.valid) {
         setMessage('Please meet all password requirements before continuing.')
         setShowChecks(true)
         setLoading(false)
@@ -109,11 +95,30 @@ export default function LoginPage() {
 
   const handleForgotPassword = async () => {
     if (!email) { setMessage('Enter your email first.'); return }
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-    if (error) setMessage(error.message)
-    else setMessage('Password reset link sent to your email!')
+
+    setLoading(true)
+    setMessage('')
+
+    // Goes through a rate-limited API route rather than calling Supabase
+    // directly from the browser, so this email trigger cannot be hit in a loop.
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const data = await res.json()
+
+      // The route deliberately returns the same message whether or not the
+      // address is registered, to avoid confirming which emails have accounts.
+      setMessage(res.ok
+        ? data.message ?? 'If an account exists for that email, a reset link is on its way.'
+        : data.error ?? 'Could not send the reset email. Please try again.')
+    } catch {
+      setMessage('Could not reach the server. Please check your connection.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -121,10 +126,10 @@ export default function LoginPage() {
 
       {/* NAVBAR */}
       <nav className="border-b border-[#E2DDD6] dark:border-slate-800 bg-[#F8F6F2] dark:bg-slate-900 px-6 py-3 flex justify-between items-center">
-        <a href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <span className="text-xl"> </span>
           <span className="font-bold text-base tracking-tight text-[#8B3A2A] dark:text-slate-100">Offera AI</span>
-        </a>
+        </Link>
         <ThemeToggle />
       </nav>
 
