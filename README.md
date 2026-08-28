@@ -135,17 +135,39 @@ You can run Offera AI in a Docker container for consistent, portable deployments
 
 ### Quick Start with Docker Compose
 
-    docker compose up --build
+    docker compose --env-file .env.local up --build
 
 Open http://localhost:3000
 
+`--env-file .env.local` is required. Compose interpolates the `${...}` build
+args from your shell or from `.env`, not from `.env.local`.
+
 ### Manual Docker Build
 
-    # Build the image
-    docker build -t offera-ai .
+    docker build -t offera-ai \
+      --build-arg NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
+      --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+      --build-arg NEXT_PUBLIC_SITE_URL="$NEXT_PUBLIC_SITE_URL" \
+      .
 
-    # Run the container
     docker run -p 3000:3000 --env-file .env.local offera-ai
+
+### Why the build args?
+
+Next.js **inlines every `NEXT_PUBLIC_*` variable into the compiled bundle** at
+build time — into the client chunks *and* the server bundle. Supplying them only
+at container runtime has no effect, because the value baked in during
+`next build` wins.
+
+Without the build args the image builds "successfully" but ships `undefined` as
+the Supabase URL and key, and the app breaks in the browser. The Dockerfile now
+fails fast if they are missing rather than producing that image.
+
+Passing them as build args is safe: `NEXT_PUBLIC_*` values are public by
+definition — they are served to every visitor inside the JS bundle.
+`OPENROUTER_API_KEY` is deliberately **not** a build arg, because build args are
+recorded in the image history; it is server-only and read from the environment
+at runtime.
 
 ### Docker Architecture
 
