@@ -15,6 +15,20 @@ import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { useInactivityLogout } from '@/lib/useInactivityLogout'
+import {
+  ALL_STATUSES,
+  createJob,
+  deleteJob,
+  emptyJobDraft,
+  jobMatchesSearch,
+  listJobs,
+  responseRate as calcResponseRate,
+  setJobStarred,
+  toDraft,
+  updateJob,
+  type Job,
+  type JobDraft,
+} from '@/lib/jobs'
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme()
@@ -31,23 +45,8 @@ function ThemeToggle() {
   )
 }
 
-type Job = {
-  id: string
-  company_name: string
-  job_title: string
-  job_description: string
-  job_url: string
-  status: string
-  applied_date: string
-  notes: string
-  is_starred: boolean
-  salary: string
-  location: string
-  work_setup: string
-  work_hours: string
-}
-
-const ALL_STATUSES = ['applied', 'exam', 'interview', 'offer', 'rejected']
+// `Job`, `JobDraft` and `ALL_STATUSES` now live in @/lib/jobs alongside the
+// queries that produce them, so the row shape is defined once.
 
 const statusConfig: Record<string, {
   label: string
@@ -66,20 +65,6 @@ const statusConfig: Record<string, {
 
 const WORK_SETUPS = ['WFH', 'Hybrid', 'Onsite', 'Online']
 
-const emptyNewJob = {
-  company_name: '',
-  job_title: '',
-  job_description: '',
-  job_url: '',
-  status: 'applied',
-  applied_date: new Date().toISOString().split('T')[0],
-  notes: '',
-  salary: '',
-  location: '',
-  work_setup: '',
-  work_hours: '',
-}
-
 const inputClass =
   'w-full px-3.5 py-2.5 text-base rounded-lg border ' +
   'border-[#D9D4CB] bg-[#F5F2ED] text-[#2C2C2C] placeholder-[#A8A099] ' +
@@ -96,8 +81,8 @@ function previewText(text: string | undefined, max = 90) {
 }
 
 function JobFormFields({ data, onChange }: {
-  data: typeof emptyNewJob
-  onChange: (updated: typeof emptyNewJob) => void
+  data: JobDraft
+  onChange: (updated: JobDraft) => void
 }) {
   return (
     <div className="space-y-5">
@@ -210,9 +195,11 @@ export default function DashboardPage() {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null)
   const [saving, setSaving] = useState(false)
   const [showNewJobModal, setShowNewJobModal] = useState(false)
-  const [newJob, setNewJob] = useState(emptyNewJob)
+  const [newJob, setNewJob] = useState<JobDraft>(emptyJobDraft)
   const [creating, setCreating] = useState(false)
   const [showMobileSidebar, setShowMobileSidebar] = useState(false)
+  // Surfaces write/read failures that were previously swallowed entirely.
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const supabase = createClient()
   useInactivityLogout()
@@ -252,11 +239,17 @@ export default function DashboardPage() {
   }, [showNewJobModal])
 
   const fetchJobs = async () => {
-    const { data } = await supabase
-      .from('job_applications')
-      .select('*')
-      .order('created_at', { ascending: false })
-    setJobs(data || [])
+    const { data, error: loadError } = await listJobs(supabase)
+
+    if (loadError !== null) {
+      // Previously this failure produced an empty list and the "No applications
+      // yet" empty state -- indistinguishable from a genuinely empty account.
+      setError(loadError)
+    } else {
+      setJobs(data)
+      setError(null)
+    }
+
     setLoading(false)
   }
 
@@ -267,70 +260,102 @@ export default function DashboardPage() {
 
   const toggleStar = async (job: Job, e: React.MouseEvent) => {
     e.stopPropagation()
-    const updated = { ...job, is_starred: !job.is_starred }
-    setJobs(jobs.map(j => j.id === job.id ? updated : j))
-    if (selectedJob?.id === job.id) setSelectedJob(updated)
-    await supabase.from('job_applications').update({ is_starred: updated.is_starred }).eq('id', job.id)
+
+    const next = !job.is_starred
+
+    // Optimistic update, but remember the previous list so it can be restored.
+    const previousJobs = jobs
+    const previousSelected = selectedJob
+    setJobs(jobs.map(j => (j.id === job.id ? { ...j, is_starred: next } : j)))
+    if (selectedJob?.id === job.id) setSelectedJob({ ...selectedJob, is_starred: next })
+
+    const { data, error: starError } = await setJobStarred(supabase, job.id, next)
+
+    if (starError !== null) {
+      setJobs(previousJobs)
+      setSelectedJob(previousSelected)
+      setError(starError)
+      return
+    }
+
+    // Trust the row the database returned rather than the optimistic guess.
+    setJobs(current => current.map(j => (j.id === data.id ? data : j)))
+    setSelectedJob(current => (current?.id === data.id ? data : current))
+    setError(null)
   }
 
   const handleSave = async () => {
     if (!selectedJob) return
+
     setSaving(true)
-    await supabase.from('job_applications').update({
-      company_name: selectedJob.company_name,
-      job_title: selectedJob.job_title,
-      status: selectedJob.status,
-      applied_date: selectedJob.applied_date,
-      job_url: selectedJob.job_url,
-      job_description: selectedJob.job_description,
-      notes: selectedJob.notes,
-      salary: selectedJob.salary,
-      location: selectedJob.location,
-      work_setup: selectedJob.work_setup,
-      work_hours: selectedJob.work_hours,
-    }).eq('id', selectedJob.id)
-    setJobs(jobs.map(j => j.id === selectedJob.id ? selectedJob : j))
+    setError(null)
+
+    const { data, error: saveError } = await updateJob(
+      supabase,
+      selectedJob.id,
+      toDraft(selectedJob),
+    )
+
+    if (saveError !== null) {
+      // Local state is left untouched so the user's edits are not lost.
+      setError(saveError)
+      setSaving(false)
+      return
+    }
+
+    setJobs(current => current.map(j => (j.id === data.id ? data : j)))
+    setSelectedJob(data)
     setSaving(false)
   }
 
   const handleDelete = async () => {
     if (!selectedJob) return
-    if (!confirm('Delete this application?')) return
-    await supabase.from('job_applications').delete().eq('id', selectedJob.id)
-    setJobs(jobs.filter(j => j.id !== selectedJob.id))
+    if (!confirm('Delete this application? This cannot be undone.')) return
+
+    const target = selectedJob
+    const { error: deleteError } = await deleteJob(supabase, target.id)
+
+    if (deleteError !== null) {
+      setError(deleteError)
+      return
+    }
+
+    setJobs(current => current.filter(j => j.id !== target.id))
     setSelectedJob(null)
+    setError(null)
   }
 
   const closeNewJobModal = () => {
     setShowNewJobModal(false)
-    setNewJob(emptyNewJob)
+    setNewJob(emptyJobDraft())
   }
 
   const handleCreateJob = async () => {
-    if (!newJob.company_name || !newJob.job_title) return
+    if (!newJob.company_name.trim() || !newJob.job_title.trim()) return
+
     setCreating(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { error } = await supabase
-      .from('job_applications')
-      .insert({ ...newJob, user_id: user?.id })
-    if (error) {
-      alert('Error saving job. Please try again.')
-    } else {
-      closeNewJobModal()
-      fetchJobs()
+    setError(null)
+
+    const { data, error: createError } = await createJob(supabase, newJob)
+
+    if (createError !== null) {
+      // Keep the modal open with the user's input intact so they can retry.
+      setError(createError)
+      setCreating(false)
+      return
     }
+
+    // listJobs orders by created_at desc, so the new row belongs at the front.
+    // Prepending avoids a second round trip.
+    setJobs(current => [data, ...current])
+    closeNewJobModal()
     setCreating(false)
   }
 
-  const filtered = jobs.filter(j =>
-    j.company_name.toLowerCase().includes(search.toLowerCase()) ||
-    j.job_title.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = jobs.filter(j => jobMatchesSearch(j, search))
 
   const starred = jobs.filter(j => j.is_starred)
-  const responseRate = jobs.length > 0
-    ? Math.round((jobs.filter(j => ['interview', 'offer'].includes(j.status)).length / jobs.length) * 100)
-    : 0
+  const responseRate = calcResponseRate(jobs)
 
   return (
     <div className="flex flex-col lg:flex-row h-screen bg-[#F0EDE6] dark:bg-slate-950 text-[#1E1915] dark:text-slate-100 overflow-hidden">
@@ -467,6 +492,25 @@ export default function DashboardPage() {
           </button>
         </header>
 
+        {/* ERROR BANNER — reads and writes used to fail silently */}
+        {error && (
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="flex items-start gap-3 px-4 lg:px-6 py-3 border-b border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950"
+          >
+            <span aria-hidden="true" className="text-base leading-5">⚠️</span>
+            <p className="flex-1 text-sm text-rose-800 dark:text-rose-200">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              aria-label="Dismiss error"
+              className="text-rose-500 hover:text-rose-800 dark:hover:text-rose-200 transition-colors text-lg leading-none"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* BOARD / LIST */}
         <div className="flex-1 overflow-auto p-4 lg:p-6">
           {loading ? (
@@ -490,7 +534,10 @@ export default function DashboardPage() {
                         >
                           <div className="flex items-start justify-between gap-2">
                             <p className="font-bold text-base text-[#1E1915] dark:text-slate-100 leading-tight">{job.company_name}</p>
-                            <button onClick={e => toggleStar(job, e)} className="text-lg flex-shrink-0 hover:scale-110 transition-transform leading-none">
+                            <button onClick={e => toggleStar(job, e)}
+                              aria-label={job.is_starred ? `Unstar ${job.company_name}` : `Star ${job.company_name}`}
+                              aria-pressed={job.is_starred}
+                              className="text-lg flex-shrink-0 hover:scale-110 transition-transform leading-none">
                               {job.is_starred ? '⭐' : <span className="text-[#C4BDB5] dark:text-slate-600">☆</span>}
                             </button>
                           </div>
@@ -528,7 +575,15 @@ export default function DashboardPage() {
           ) : (
             <div className="bg-white dark:bg-slate-900 rounded-xl border border-[#E2DDD6] dark:border-slate-800 overflow-hidden">
               {filtered.length === 0 ? (
-                <div className="text-center py-20 text-[#A8A099] dark:text-slate-500 text-base">No applications yet</div>
+                <div className="text-center py-20 text-[#A8A099] dark:text-slate-500 text-base">
+                  {/* Distinguish "load failed", "search matched nothing" and
+                      "genuinely empty" -- all three used to read the same. */}
+                  {error
+                    ? 'Could not load your applications.'
+                    : search.trim()
+                      ? `No applications match “${search.trim()}”`
+                      : 'No applications yet'}
+                </div>
               ) : (
                 <div className="divide-y divide-[#EAE6DF] dark:divide-slate-800">
                   {filtered.map(job => {
@@ -551,7 +606,10 @@ export default function DashboardPage() {
                           {job.salary && <p className="text-sm font-semibold text-[#4A4540] dark:text-slate-300 hidden md:block">{job.salary}</p>}
                           <p className="text-xs text-[#A8A099] dark:text-slate-500 hidden sm:block">{job.applied_date}</p>
                           <span className={`text-xs px-2 lg:px-3 py-1 lg:py-1.5 rounded-full font-medium ${cfg.badge} ${cfg.badgeDark}`}>{cfg.label}</span>
-                          <button onClick={e => toggleStar(job, e)} className="text-base hover:scale-110 transition-transform">
+                          <button onClick={e => toggleStar(job, e)}
+                            aria-label={job.is_starred ? `Unstar ${job.company_name}` : `Star ${job.company_name}`}
+                            aria-pressed={job.is_starred}
+                            className="text-base hover:scale-110 transition-transform">
                             {job.is_starred ? '⭐' : <span className="text-[#C4BDB5] dark:text-slate-600">☆</span>}
                           </button>
                         </div>
@@ -604,7 +662,10 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-bold text-lg text-[#1E1915] dark:text-slate-100">{selectedJob.company_name}</h2>
-                <button onClick={e => toggleStar(selectedJob, e)} className="text-lg hover:scale-110 transition-transform">
+                <button onClick={e => toggleStar(selectedJob, e)}
+                  aria-label={selectedJob.is_starred ? `Unstar ${selectedJob.company_name}` : `Star ${selectedJob.company_name}`}
+                  aria-pressed={selectedJob.is_starred}
+                  className="text-lg hover:scale-110 transition-transform">
                   {selectedJob.is_starred ? '⭐' : <span className="text-[#C4BDB5] dark:text-slate-600">☆</span>}
                 </button>
               </div>
@@ -637,7 +698,7 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-[#F5F2ED] dark:bg-slate-800 rounded-lg p-3.5">
                 <p className="text-xs text-[#A8A099] dark:text-slate-500 mb-1.5 uppercase tracking-widest font-semibold">Applied</p>
-                <input type="date" value={selectedJob.applied_date}
+                <input type="date" value={selectedJob.applied_date ?? ''}
                   onChange={e => setSelectedJob({ ...selectedJob, applied_date: e.target.value })}
                   className="text-base font-medium bg-transparent outline-none w-full text-[#1E1915] dark:text-slate-100"
                 />
