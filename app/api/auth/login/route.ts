@@ -4,14 +4,14 @@
 // Prevents brute force password attacks.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { rateLimit, checkLockout, recordFailedAttempt, clearFailedAttempts } from '@/lib/ratelimit'
+import { rateLimit, checkLockout, recordFailedAttempt, clearFailedAttempts, clientIp } from '@/lib/ratelimit'
 import { createClient } from '@supabase/supabase-js'
 
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for') ?? 'anonymous'
+  const ip = clientIp(request)
 
   // Check if IP is locked out
-  if (checkLockout(ip)) {
+  if (await checkLockout(ip)) {
     return NextResponse.json(
       { error: 'Too many failed attempts. Please wait 15 minutes before trying again.' },
       { status: 429 }
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Rate limit — max 10 requests per minute per IP
-  const { success } = rateLimit(ip, 10, 60_000)
+  const { success } = await rateLimit(ip, 10, 60_000)
   if (!success) {
     return NextResponse.json(
       { error: 'Too many requests. Please slow down.' },
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     // Record failed attempt — lockout after 5 failures
-    const { locked, attempts } = recordFailedAttempt(ip)
+    const { locked, attempts } = await recordFailedAttempt(ip)
     if (locked) {
       return NextResponse.json(
         { error: 'Too many failed attempts. You are locked out for 15 minutes.' },
@@ -56,6 +56,6 @@ export async function POST(request: NextRequest) {
   }
 
   // Successful login — clear failed attempts
-  clearFailedAttempts(ip)
+  await clearFailedAttempts(ip)
   return NextResponse.json({ session: data.session })
 }

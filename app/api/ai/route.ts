@@ -7,7 +7,7 @@
 // Verifies JWT token to ensure only logged-in users can call this route.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { rateLimit } from '@/lib/ratelimit'
+import { rateLimit, clientIp } from '@/lib/ratelimit'
 import { sanitize } from '@/lib/sanitize'
 import { createClient } from '@supabase/supabase-js'
 
@@ -20,8 +20,8 @@ const prompts = {
 export async function POST(request: NextRequest) {
   try {
     // Rate limit — max 10 AI requests per minute per IP
-    const ip = request.headers.get('x-forwarded-for') ?? 'anonymous'
-    const { success } = rateLimit(ip)
+    const ip = clientIp(request)
+    const { success } = await rateLimit(ip)
     if (!success) {
       return NextResponse.json(
         { error: 'Too many requests. Please wait a minute before trying again.' },

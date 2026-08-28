@@ -6,23 +6,15 @@
 // Prevents spam account creation.
 
 import { NextRequest, NextResponse } from 'next/server'
-import { rateLimit } from '@/lib/ratelimit'
+import { rateLimit, clientIp } from '@/lib/ratelimit'
+import { validatePassword } from '@/lib/password'
 import { createClient } from '@supabase/supabase-js'
 
-function validatePassword(password: string): string | null {
-  if (password.length < 8) return 'Password must be at least 8 characters.'
-  if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter.'
-  if (!/[a-z]/.test(password)) return 'Password must contain at least one lowercase letter.'
-  if (!/[0-9]/.test(password)) return 'Password must contain at least one number.'
-  if (!/[^A-Za-z0-9]/.test(password)) return 'Password must contain at least one special character (e.g. !@#$%).'
-  return null
-}
-
 export async function POST(request: NextRequest) {
-  const ip = request.headers.get('x-forwarded-for') ?? 'anonymous'
+  const ip = clientIp(request)
 
   // Max 3 signups per hour per IP
-  const { success } = rateLimit(ip, 3, 60 * 60 * 1000)
+  const { success } = await rateLimit(ip, 3, 60 * 60 * 1000)
   if (!success) {
     return NextResponse.json(
       { error: 'Too many signup attempts. Please wait an hour before trying again.' },
@@ -55,12 +47,11 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Check if email already exists
-  const { data: existingUser } = await supabase
-    .from('auth.users')
-    .select('id')
-    .eq('email', email)
-    .maybeSingle()
+  // NOTE: a `.from('auth.users').select('id')` pre-check used to sit here. It
+  // could never work -- PostgREST does not expose the `auth` schema, and the
+  // anon key has no access to it -- so it always returned null and its result
+  // was never read. Duplicate emails are detected below, from the signUp
+  // response itself, which is the only reliable signal.
 
   const emailRedirectTo = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
 
