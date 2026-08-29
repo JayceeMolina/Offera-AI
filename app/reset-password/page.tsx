@@ -45,78 +45,94 @@ export default function ResetPasswordPage() {
 
   // Establish whether we actually have a recovery session to work with.
   //
-  // This project uses the IMPLICIT flow for recovery, so Supabase appends the
+  // Recovery on this project uses the IMPLICIT flow, so Supabase appends the
   // session to the URL as a fragment:
   //
   //   /reset-password#access_token=...&refresh_token=...&type=recovery
   //
-  // The browser client parses that fragment on initialisation
-  // (`detectSessionInUrl`, on by default) and then fires a PASSWORD_RECOVERY
-  // event. We listen for that event *and* poll getSession() once, because the
-  // event can fire before this effect subscribes -- whichever resolves first
-  // wins.
+  // We consume that fragment EXPLICITLY rather than relying on the client's
+  // `detectSessionInUrl`. Reason: @supabase/ssr's createBrowserClient defaults to
+  // `flowType: 'pkce'`, and a PKCE client only auto-exchanges a `?code=` query
+  // parameter -- it ignores an implicit-flow fragment completely. That is why an
+  // earlier revision sat on "Verifying your reset link..." with a perfectly valid
+  // access_token visible in the address bar, then timed out and wrongly blamed an
+  // expired link.
   //
-  // Reading window.location directly rather than useSearchParams keeps this page
-  // statically renderable (useSearchParams would force a Suspense boundary), and
-  // is required anyway: useSearchParams cannot see fragments.
+  // setSession() with explicit tokens works regardless of flowType, so this no
+  // longer depends on client behaviour we do not control.
+  //
+  // Reading window.location rather than useSearchParams is required here:
+  // useSearchParams cannot see fragments. It also keeps the page statically
+  // renderable.
   useEffect(() => {
     let cancelled = false
-    let settled = false
 
-    const fail = (reason: string) => {
-      if (cancelled || settled) return
-      settled = true
-      setStatus('invalid')
-      setMessage(reason)
-    }
+    const run = async () => {
+      // Supabase reports failures in the fragment for the implicit flow and in
+      // the query string for the code flow. Check both.
+      const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+      const query = new URLSearchParams(window.location.search)
 
-    const succeed = () => {
-      if (cancelled || settled) return
-      settled = true
-      setStatus('ready')
-    }
+      const errorCode =
+        fragment.get('error_code') ?? query.get('error_code') ??
+        fragment.get('error') ?? query.get('error')
 
-    // Supabase reports failures in the fragment for the implicit flow, and in
-    // the query string for the code flow. Check both.
-    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-    const query = new URLSearchParams(window.location.search)
-
-    const errorCode =
-      fragment.get('error_code') ?? query.get('error_code') ??
-      fragment.get('error') ?? query.get('error')
-
-    if (errorCode) {
-      fail(
-        errorCode === 'otp_expired'
-          ? 'This reset link has expired. Please request a new one.'
-          : 'This reset link is invalid or has already been used. Please request a new one.',
-      )
-      return
-    }
-
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || session) succeed()
-    })
-
-    // Covers the case where the session was already established before we
-    // subscribed above.
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        succeed()
+      if (errorCode) {
+        if (cancelled) return
+        setStatus('invalid')
+        setMessage(
+          errorCode === 'otp_expired'
+            ? 'This reset link has expired. Please request a new one.'
+            : 'This reset link is invalid or has already been used. Please request a new one.',
+        )
         return
       }
 
-      // Nothing in the URL and no session: give detectSessionInUrl a brief
-      // window to finish, then treat the link as unusable rather than leaving
-      // the user on a spinner forever.
-      setTimeout(() => {
-        fail('This reset link has expired or is invalid. Please request a new one.')
-      }, 3000)
-    })
+      // --- Implicit flow: tokens arrived in the fragment ---
+      const accessToken = fragment.get('access_token')
+      const refreshToken = fragment.get('refresh_token')
+
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        })
+
+        if (cancelled) return
+
+        if (error) {
+          console.error('[reset-password] setSession failed:', error.message)
+          setStatus('invalid')
+          setMessage('This reset link has expired or has already been used. Please request a new one.')
+          return
+        }
+
+        // Strip the tokens out of the address bar. They are credentials, and
+        // leaving them there puts them in browser history and in anything the
+        // user might copy or share.
+        window.history.replaceState(null, '', window.location.pathname)
+
+        setStatus('ready')
+        return
+      }
+
+      // --- Code flow, or a session already established on this client ---
+      const { data } = await supabase.auth.getSession()
+      if (cancelled) return
+
+      if (data.session) {
+        setStatus('ready')
+        return
+      }
+
+      setStatus('invalid')
+      setMessage('This reset link is invalid or has already been used. Please request a new one.')
+    }
+
+    run()
 
     return () => {
       cancelled = true
-      listener.subscription.unsubscribe()
     }
   }, [supabase])
 
