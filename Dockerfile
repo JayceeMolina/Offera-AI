@@ -32,6 +32,35 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# ---- NEXT_PUBLIC_* must be present at BUILD time ----
+#
+# Next.js inlines every NEXT_PUBLIC_* variable into the compiled output -- both
+# the client chunks and the server bundle. They are substituted during `next
+# build`, so supplying them only at container runtime has no effect: the value
+# baked into the bundle wins.
+#
+# Without these ARGs the image builds "successfully" but ships
+# `undefined` as the Supabase URL and key, and the app fails in the browser.
+#
+# Passing these as build args is safe: NEXT_PUBLIC_* values are public by
+# definition -- they are served to every visitor inside the JS bundle. Never add
+# a server-only secret (OPENROUTER_API_KEY) here, because build args are
+# recorded in the image history. Server-only variables are read from the real
+# environment at runtime and must stay runtime-only.
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_SITE_URL
+
+ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+
+# Fail loudly at build time rather than shipping a broken image.
+# ${VAR:?msg} aborts the shell with a non-zero status when VAR is unset or empty.
+RUN : "${NEXT_PUBLIC_SUPABASE_URL:?is required as a --build-arg}" \
+ && : "${NEXT_PUBLIC_SUPABASE_ANON_KEY:?is required as a --build-arg}" \
+ && : "${NEXT_PUBLIC_SITE_URL:?is required as a --build-arg}"
+
 # Build the Next.js application
 RUN npm run build
 

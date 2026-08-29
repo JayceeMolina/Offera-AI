@@ -56,7 +56,7 @@ export default function PrivacyPage() {
             },
             {
               title: '3. AI Tools',
-              content: "When you use AI tools, your input is sent to Google's Gemini API to generate a response. We do not store your AI inputs or outputs permanently. Google's privacy policy applies to data processed through their service.",
+              content: 'When you use AI tools, your input is sent to OpenRouter, which routes the request to one of its available free AI models to generate a response. We do not store your AI inputs or outputs. Because OpenRouter selects the model at request time, the specific model provider that processes your input may vary between requests. OpenRouter\u2019s privacy policy, and that of the selected model provider, apply to data processed through their service. Avoid pasting information you would not want sent to a third-party AI provider.',
             },
             {
               title: '4. Automation (n8n + Remotive)',
@@ -68,7 +68,7 @@ export default function PrivacyPage() {
             },
             {
               title: '6. Cookies & Sessions',
-              content: 'We use session cookies to keep you logged in. Sessions automatically expire after 30 minutes of inactivity. We do not use tracking or advertising cookies.',
+              content: 'We use session cookies to keep you logged in. While the app is open, you are signed out automatically after 30 minutes without interaction. This is a convenience feature that runs in your browser — it does not survive a page reload, so on a shared or public computer you should sign out explicitly rather than relying on it. We do not use tracking or advertising cookies.',
             },
             {
               title: '7. Data Deletion',
@@ -80,7 +80,7 @@ export default function PrivacyPage() {
             },
             {
               title: '9. Third-Party Services',
-              content: 'Offera AI integrates with the following third-party services: Supabase (database and authentication), Google Gemini (AI text generation), and optionally Remotive (job listings via user-initiated automation). Each service has its own privacy policy. We only share the minimum data required for each service to function.',
+              content: 'Offera AI integrates with the following third-party services: Supabase (database and authentication), OpenRouter (AI text generation, which in turn forwards requests to the model provider it selects), and optionally Remotive (job listings via user-initiated automation). Each service has its own privacy policy. We only share the minimum data required for each service to function.',
             },
             {
               title: '10. Changes to This Policy',

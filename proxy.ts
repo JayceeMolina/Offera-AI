@@ -1,14 +1,22 @@
-// MIDDLEWARE / PROXY
+// PROXY (formerly middleware.ts)
 // Protects /dashboard and /ai routes from unauthenticated access.
 // Redirects unauthenticated users to /login.
 // Redirects logged-in users away from /login back to /dashboard.
-// This is the security guard of the entire app.
+// This is the server-side security guard of the entire app.
+//
+// Renamed from middleware.ts per the Next.js 16 deprecation: the `middleware`
+// file convention and named export are deprecated in favour of `proxy`.
+// See node_modules/next/dist/docs/01-app/02-guides/upgrading/version-16.md
+//
+// Note: `proxy` runs on the Node.js runtime and that is not configurable. This
+// guard calls supabase.auth.getUser(), a network request, so Node is the
+// appropriate runtime here regardless.
 
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+export async function proxy(request: NextRequest) {
+  const supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
