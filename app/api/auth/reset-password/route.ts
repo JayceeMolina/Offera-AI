@@ -14,9 +14,25 @@
 //   depended on which host the requester happened to be on. Now it uses
 //   NEXT_PUBLIC_SITE_URL, consistently with the signup confirmation email.
 //
-//   The link now points at /auth/callback (which exchanges the code for a
-//   session) rather than directly at /reset-password. See the callback route
-//   for why that matters.
+// WHY THE LINK POINTS AT /reset-password AND NOT /auth/callback
+//
+// An earlier revision of this route sent users to
+// `/auth/callback?next=/reset-password` on the assumption that recovery used the
+// PKCE code flow. It does not.
+//
+// PKCE requires a `code_verifier` that is generated and stored in the *browser*
+// when the reset is requested. This route runs on the server with
+// @supabase/supabase-js, so no verifier is ever stored, and Supabase therefore
+// falls back to the implicit flow -- returning the session as a URL *fragment*:
+//
+//   /reset-password#access_token=...&refresh_token=...&type=recovery
+//
+// Fragments are never transmitted to the server, so a route handler physically
+// cannot read them. /auth/callback saw no `?code=` and bounced users to
+// /login?error=missing_code.
+//
+// The destination must therefore be a client page, where the browser client's
+// `detectSessionInUrl` can parse the fragment and establish the session.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { rateLimit, clientIp } from '@/lib/ratelimit'
@@ -61,7 +77,7 @@ export async function POST(request: NextRequest) {
   )
 
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-    redirectTo: `${siteUrl}/auth/callback?next=%2Freset-password`,
+    redirectTo: `${siteUrl}/reset-password`,
   })
 
   if (error) {
