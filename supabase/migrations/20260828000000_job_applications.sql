@@ -94,11 +94,22 @@ create index if not exists job_applications_user_starred_idx
 -- `Prefer: resolution=ignore-duplicates`, which requires a unique constraint
 -- to conflict against -- without this index, every scheduled run re-imports
 -- the same jobs. Documented in app/automation/page.tsx.
--- NULLS NOT DISTINCT so that manually-added rows without a job_url do not all
--- collide with each other.
+--
+-- PARTIAL index, excluding rows with no job_url. This matters:
+--
+--   lib/jobs.ts toPayload() normalises an empty job_url to NULL, so every job
+--   added by hand without a link stores NULL. An earlier version of this index
+--   used NULLS NOT DISTINCT, which treats two NULLs as equal -- meaning a user
+--   could only ever save ONE application without a URL. The second insert
+--   failed the unique check and surfaced as "You have already saved an
+--   application for that job URL", which is nonsense for two jobs that have no
+--   URL at all.
+--
+-- Excluding NULL (and defensively '') keeps dedupe working for the importer,
+-- which always supplies a real URL, without constraining manual entries.
 create unique index if not exists job_applications_user_job_url_key
   on public.job_applications (user_id, job_url)
-  nulls not distinct;
+  where job_url is not null and job_url <> '';
 
 
 -- ---------------------------------------------------------------------------
