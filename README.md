@@ -16,8 +16,8 @@ A full-stack AI-powered job application tracking platform built with Next.js, Ty
 - 🔍 **Search & Filter** — search across all applications instantly
 - 🌙 **Dark Mode** — full light/dark mode support
 - 📊 **Response Rate Tracker** — see your interview success rate at a glance
-- 🚧 **Job Automation** — not available yet; `/automation` is a placeholder
-  (see [Automation](#automation--work-in-progress))
+- 🚧 **Job Automation** — auto-import remote listings from Remotive; currently a
+  work in progress (see [Automation](#automation--work-in-progress))
 
 ---
 
@@ -198,16 +198,17 @@ at runtime.
 
 ## Automation — work in progress
 
-Automatic job importing is **not currently available**. `/automation` is a
-placeholder while the feature is designed.
+Automatically importing remote job listings from [Remotive](https://remotive.com)
+is **currently a work in progress**. It is not enabled, and `/automation` is a
+placeholder until it ships.
 
-Applications are added manually from the dashboard. Everything else — the board,
-AI tools, and stats — is unaffected.
+For now, applications are added manually from the dashboard with **+ Add Job**.
+Everything else — the board, AI tools, and stats — is unaffected.
 
 The partial unique index on `(user_id, job_url)` in
-[`supabase/migrations/`](./supabase/migrations) is retained regardless: it
-prevents the same posting being saved twice by hand, and it excludes `NULL` and
-`''` so applications without a URL are unaffected.
+[`supabase/migrations/`](./supabase/migrations) is in place ready for it: it
+prevents the same posting being saved twice, and it excludes `NULL` and `''` so
+applications added without a URL are unaffected.
 
 ---
 
@@ -261,7 +262,7 @@ npm ci  →  eslint  →  tsc --noEmit  →  npm test  →  npm run build  →  
     │   │   ├── ai/            # AI route (OpenRouter), JWT-verified + rate limited
     │   │   └── auth/          # login, signup, reset-password — all rate limited
     │   ├── auth/callback/     # Exchanges email link code for a session
-    │   ├── automation/        # Placeholder — feature being redesigned
+    │   ├── automation/        # Placeholder — work in progress
     │   ├── dashboard/         # Main board / list dashboard
     │   ├── ai/                # AI tools page
     │   ├── login/             # Login + signup
