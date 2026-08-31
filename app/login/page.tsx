@@ -174,7 +174,6 @@ export default function LoginPage() {
       {/* NAVBAR */}
       <nav className="border-b border-[#E2DDD6] dark:border-slate-800 bg-[#F8F6F2] dark:bg-slate-900 px-6 py-3 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <span className="text-xl"> </span>
           <span className="font-bold text-base tracking-tight text-[#8B3A2A] dark:text-slate-100">Offera AI</span>
         </Link>
         <ThemeToggle />

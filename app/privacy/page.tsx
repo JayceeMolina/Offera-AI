@@ -7,6 +7,7 @@
 
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme()
@@ -29,10 +30,9 @@ export default function PrivacyPage() {
 
       {/* NAVBAR */}
       <nav className="border-b border-[#E2DDD6] dark:border-slate-800 bg-[#F8F6F2] dark:bg-slate-900 px-6 py-3 flex justify-between items-center">
-        <a href="/login" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <span className="text-xl"> </span>
+        <Link href="/login" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <span className="font-bold text-base tracking-tight text-[#8B3A2A] dark:text-slate-100">Offera AI</span>
-        </a>
+        </Link>
         <ThemeToggle />
       </nav>
 
@@ -101,7 +101,7 @@ export default function PrivacyPage() {
 
       {/* FOOTER */}
       <footer className="border-t border-[#E2DDD6] dark:border-slate-800 bg-[#F8F6F2] dark:bg-slate-950 px-6 py-6 text-center text-sm text-[#A8A099] dark:text-slate-500">
-        <a href="/login" className="hover:underline text-[#8B3A2A] dark:text-indigo-400">← Back to Offera AI</a>
+        <Link href="/login" className="hover:underline text-[#8B3A2A] dark:text-indigo-400">← Back to Offera AI</Link>
       </footer>
 
     </div>

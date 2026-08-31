@@ -8,7 +8,6 @@
 import Link from 'next/link'
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme()
@@ -33,7 +32,6 @@ export default function LandingPage() {
       <nav className="sticky top-0 z-50 border-b border-[#E2DDD6] dark:border-slate-800 bg-[#F8F6F2]/90 dark:bg-slate-950/90 backdrop-blur-sm px-6 py-3">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <span className="text-xl"> </span>
             <span className="font-bold text-base tracking-tight text-[#8B3A2A] dark:text-slate-100">Offera AI</span>
           </div>
           <div className="flex items-center gap-2">
