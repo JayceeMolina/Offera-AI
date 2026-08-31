@@ -34,36 +34,41 @@ select relrowsecurity, relforcerowsecurity
 from pg_class where relname = 'job_applications';
 ```
 
-## Heads-up: this affects the n8n automation
+## `anon` is revoked — and why that is safe
 
 The migration ends with `revoke all on public.job_applications from anon`.
 
-`app/automation/page.tsx` currently tells users to authenticate the n8n HTTP
-node with the **anon** key and a hardcoded `user_id`. That cannot work under
-RLS, with or without this migration: for an `anon` request `auth.uid()` is
-`NULL`, so the policy check `auth.uid() = user_id` evaluates to `NULL` rather
-than true and the insert is rejected. The revoke does not break a working
-setup — it makes an already-failing one fail clearly, at the permission layer,
-instead of silently inserting zero rows.
+Nothing in the app is affected: every code path that touches this table requires
+a signed-in user. RLS already denied anonymous access, because `auth.uid()` is
+`NULL` for an `anon` request and the policy check `auth.uid() = user_id` can
+never match. The revoke moves that denial from the row layer to the permission
+layer, so an anonymous attempt fails clearly instead of silently returning or
+inserting zero rows.
 
-To make the importer actually work, the n8n node must authenticate as something
-that satisfies (or legitimately bypasses) the policy:
+This is also what made the old n8n importer impossible. It instructed users to
+authenticate with the `anon` key and a hardcoded `user_id`, which could never
+satisfy the policy. That feature has been removed — see the Automation section in
+the root README. If it is ever rebuilt, note that the only credentials which
+satisfy the policy are:
 
 | Approach | Works | Notes |
 |---|---|---|
-| `anon` key | No | `auth.uid()` is NULL — policy can never match |
-| User access token | Briefly | Real JWT, but expires in ~1 hour; useless for a 12-hour schedule |
-| `service_role` key | Yes | Bypasses RLS, so the hardcoded `user_id` is honored |
+| `anon` key | No | `auth.uid()` is NULL — the policy can never match |
+| User access token | Briefly | A real JWT, but expires in about an hour |
+| `service_role` key | Yes | Bypasses RLS entirely — treat it like a database password, never expose it to a browser or a hosted automation service |
 
-For a **self-hosted, local-only** n8n instance, the `service_role` key is the
-practical option — but understand what it is: a key that bypasses RLS entirely
-and can read and write every user's rows. Treat it like a database password.
+## The `job_url` unique index
 
-- Never put it in a hosted/shared n8n instance
-- Never commit it, and never expose it to a browser
-- Store it in an n8n credential, not inline in the workflow JSON
+`job_applications_user_job_url_key` is a **partial** unique index on
+`(user_id, job_url)`, covering only rows where `job_url` is neither `NULL` nor
+`''`.
 
-The dedupe behavior the automation relies on (`Prefer:
-resolution=ignore-duplicates`) needs a unique constraint to conflict against.
-That is `job_applications_user_job_url_key`, created by this migration. Without
-it, every scheduled run re-imports the same jobs.
+The partial predicate is load-bearing, not cosmetic. `lib/jobs.ts` normalises an
+empty `job_url` to `NULL`, so every application added by hand without a link
+stores `NULL`. An earlier revision of this index used `NULLS NOT DISTINCT`, which
+treats two `NULL`s as equal — limiting each user to exactly **one** application
+without a URL, and reporting the second as *"You have already saved an
+application for that job URL"*.
+
+There is a unit test (`lib/jobs.test.ts`) asserting the `'' -> NULL` mapping and
+naming this index, so the two cannot drift apart silently.

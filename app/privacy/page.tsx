@@ -44,8 +44,8 @@ export default function PrivacyPage() {
               content: 'When you use AI tools, your input is sent to OpenRouter, which routes the request to one of its available free AI models to generate a response. We do not store your AI inputs or outputs. Because OpenRouter selects the model at request time, the specific model provider that processes your input may vary between requests. OpenRouter\u2019s privacy policy, and that of the selected model provider, apply to data processed through their service. Avoid pasting information you would not want sent to a third-party AI provider.',
             },
             {
-              title: '4. Automation (n8n + Remotive)',
-              content: 'Offera AI offers an optional automation feature that allows you to auto-import remote job listings from Remotive into your dashboard using n8n. This automation runs entirely on your own machine — Offera AI\'s servers never access Remotive\'s API on your behalf. Your Supabase credentials are stored locally in your n8n instance and are never transmitted to or stored by Offera AI. Job data imported via automation is stored in your personal database and subject to the same Row Level Security protections as manually entered data.',
+              title: '4. Automation',
+              content: 'Automatic job importing is not currently available. A previous version of this app documented an optional integration with Remotive via a self-hosted n8n workflow; that guide has been removed and the feature is not active. No job data is imported from any third party, and no automated process reads or writes your account. Every application in your dashboard is one you added yourself. If automated importing returns in future, this policy will be updated before it is enabled.',
             },
             {
               title: '5. Data Storage',
@@ -61,11 +61,11 @@ export default function PrivacyPage() {
             },
             {
               title: '8. Security',
-              content: 'We implement industry-standard security practices including JWT authentication, rate limiting, input sanitization, HTTP security headers, and encrypted data transmission.',
+              content: 'We implement industry-standard security practices including JWT authentication, rate limiting on login and account-related endpoints, brute-force lockout, input sanitization, encrypted data transmission enforced via HSTS, and a Content Security Policy that restricts which scripts and network connections the app is allowed to make. Automated checks run on every code change before it is deployed. No security measure is absolute, so please use a unique password and sign out on shared devices.',
             },
             {
               title: '9. Third-Party Services',
-              content: 'Offera AI integrates with the following third-party services: Supabase (database and authentication), OpenRouter (AI text generation, which in turn forwards requests to the model provider it selects), and optionally Remotive (job listings via user-initiated automation). Each service has its own privacy policy. We only share the minimum data required for each service to function.',
+              content: 'Offera AI integrates with two third-party services: Supabase (database and authentication) and OpenRouter (AI text generation, which in turn forwards requests to the model provider it selects). Each has its own privacy policy. We share only the minimum data required for each to function. Remotive is no longer used — the automation feature that relied on it has been removed.',
             },
             {
               title: '10. Changes to This Policy',
