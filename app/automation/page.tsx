@@ -64,28 +64,9 @@ export default function AutomationPage() {
             </p>
           </div>
 
-          <div className="text-left bg-[#F5F2ED] dark:bg-slate-800 rounded-lg p-5 border border-[#E2DDD6] dark:border-slate-700 space-y-3">
-            <p className="text-sm font-semibold text-[#1E1915] dark:text-slate-100">
-              What happened to the n8n guide?
-            </p>
+          <div className="text-left bg-[#F5F2ED] dark:bg-slate-800 rounded-lg p-5 border border-[#E2DDD6] dark:border-slate-700">
             <p className="text-sm text-[#7A7068] dark:text-slate-400 leading-relaxed">
-              It was removed because it could not actually work. The setup relied on
-              connecting with a key that has no permission to write to your account,
-              so every import was silently rejected by the database — the workflow
-              appeared to run and added nothing.
-            </p>
-            <p className="text-sm text-[#7A7068] dark:text-slate-400 leading-relaxed">
-              Making it work securely needs a different approach than a copy-paste
-              guide, so it&apos;s being redesigned rather than patched.
-            </p>
-          </div>
-
-          <div className="text-left space-y-3">
-            <p className="text-sm font-semibold text-[#1E1915] dark:text-slate-100">
-              In the meantime
-            </p>
-            <p className="text-sm text-[#7A7068] dark:text-slate-400 leading-relaxed">
-              Add applications from the dashboard with{' '}
+              In the meantime, add applications from the dashboard with{' '}
               <span className="font-semibold text-[#8B3A2A] dark:text-indigo-400">+ Add Job</span>.
               Everything else — the board, AI tools, and stats — works normally.
             </p>
