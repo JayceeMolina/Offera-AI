@@ -145,8 +145,14 @@ export function toDraft(job: Job): JobDraft {
  * Empty strings become null for nullable columns. This matters most for
  * `applied_date`: it is a DATE column, and Postgres rejects '' outright, so
  * clearing the date field used to produce an opaque write failure.
+ *
+ * Exported for testing. The '' -> null mapping is load-bearing for the database
+ * schema: because an empty job_url becomes NULL, the unique index on
+ * (user_id, job_url) MUST exclude NULL. An earlier version used
+ * NULLS NOT DISTINCT and limited every user to one job without a URL. See
+ * lib/jobs.test.ts and the index definition in supabase/migrations/.
  */
-function toPayload(draft: Partial<JobDraft>): Record<string, string | null> {
+export function toPayload(draft: Partial<JobDraft>): Record<string, string | null> {
   const payload: Record<string, string | null> = {}
 
   for (const column of WRITABLE_COLUMNS) {
