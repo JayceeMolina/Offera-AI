@@ -2,7 +2,7 @@
 
 A full-stack AI-powered job application tracking platform built with Next.js, TypeScript, and Supabase.
 
-🔗 **Live Demo:** [your-url.vercel.app](https://offera-ai.vercel.app/)
+🔗 **Live Demo:** [offera-ai.vercel.app](https://offera-ai.vercel.app/)
 
 ---
 
@@ -15,7 +15,8 @@ A full-stack AI-powered job application tracking platform built with Next.js, Ty
 - ⭐ **Star & Track** — star important applications for quick access
 - 🔍 **Search & Filter** — search across all applications instantly
 - 🌙 **Dark Mode** — full light/dark mode support
-- 📊 **Response Rate Tracker** — see your interview success rate at a glance
+- 📊 **Response Rate Tracker** — the share of applications that got a reply
+  (exam, interview, or offer) at a glance
 - 🚧 **Job Automation** — auto-import remote listings from Remotive; currently a
   work in progress (see [Automation](#automation--work-in-progress))
 
@@ -44,10 +45,12 @@ A full-stack AI-powered job application tracking platform built with Next.js, Ty
 - IP-based rate limiting: 10 req/min general, 3/hour on signup and password reset,
   5 failed logins → 15 minute lockout
 - Account enumeration protection on password reset (identical response either way)
-- Redirect allowlist on the auth callback (no open redirect)
 - Shared password policy enforced on both signup and reset
-- Input sanitization before the AI call; AI output is rendered as React elements,
-  never `dangerouslySetInnerHTML`
+- Strict input validation on every API route: unknown tool names, malformed JSON
+  bodies and wrong types are rejected with a 400 rather than reaching Supabase
+- Upstream errors are logged server-side, never forwarded to the client
+- Control characters stripped from AI input; AI output is rendered as React
+  elements, never `dangerouslySetInnerHTML`
 - **Content Security Policy** (enforced) — restricts scripts, styles and network
   connections to this origin plus Supabase
 - **HSTS** — `max-age=63072000; includeSubDomains`, production only
@@ -77,8 +80,8 @@ Being explicit about what these controls do *not* cover:
   not lazy. `next-themes` injects an inline script to set the theme before first
   paint, Next.js emits inline hydration scripts, and React style props such as
   the response-rate bar render as inline `style` attributes. The textbook fix is
-  a per-request nonce, but that forces every route to render dynamically and 13
-  of 15 routes are currently statically prerendered. The policy still blocks
+  a per-request nonce, but that forces every route to render dynamically and 8
+  of the 13 routes are currently statically prerendered. The policy still blocks
   scripts from any external origin, which is the attack it most needs to stop.
 - **`X-XSS-Protection` has been removed.** It was a non-standard filter that
   Chrome, Edge and Safari have all deleted and Firefox never shipped. CSP
@@ -188,7 +191,7 @@ at runtime.
 
 ### Docker Architecture
 
-- **Multi-stage build** — 3 stages (deps → build → production) for minimal image size (~150MB)
+- **Multi-stage build** — 3 stages (deps → build → production); the final image is ~190 MB
 - **Alpine Linux** — lightweight base image with reduced attack surface
 - **Non-root user** — container runs as unprivileged user for security
 - **Standalone output** — Next.js standalone mode for optimized production builds
@@ -290,10 +293,11 @@ npm ci  →  eslint  →  tsc --noEmit  →  npm test  →  npm run build  →  
     ├── docker-compose.yml     # Local Docker development
     ├── vitest.config.mts      # Test config
     ├── .env.example           # Documented environment template
+    ├── LICENSE                # MIT
     └── next.config.ts         # CSP, HSTS, security headers + standalone output
 
 ---
 
 ## License
 
-MIT — feel free to use this project as a reference or template.
+[MIT](./LICENSE) — feel free to use this project as a reference or template.
