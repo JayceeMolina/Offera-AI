@@ -41,16 +41,6 @@ import { createClient } from '@supabase/supabase-js'
 export async function POST(request: NextRequest) {
   const ip = clientIp(request)
 
-  // Max 3 reset emails per hour per IP — matches the signup limit, since both
-  // cause an email to be sent.
-  const { success } = await rateLimit(ip, 3, 60 * 60 * 1000)
-  if (!success) {
-    return NextResponse.json(
-      { error: 'Too many password reset requests. Please wait an hour before trying again.' },
-      { status: 429 },
-    )
-  }
-
   let email: unknown
   try {
     ({ email } = await request.json())
@@ -60,6 +50,20 @@ export async function POST(request: NextRequest) {
 
   if (typeof email !== 'string' || !email.trim()) {
     return NextResponse.json({ error: 'Enter your email address.' }, { status: 400 })
+  }
+
+  // Max 3 reset emails per hour per IP — matches the signup limit, since both
+  // cause an email to be sent.
+  //
+  // Consumed AFTER validation: the limiter previously ran first, so submitting
+  // the form with an empty field three times burned the whole hourly budget
+  // without a single email having been sent.
+  const { success } = await rateLimit(ip, 3, 60 * 60 * 1000)
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Too many password reset requests. Please wait an hour before trying again.' },
+      { status: 429 },
+    )
   }
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
