@@ -16,8 +16,8 @@ A full-stack AI-powered job application tracking platform built with Next.js, Ty
 - 🔍 **Search & Filter** — search across all applications instantly
 - 🌙 **Dark Mode** — full light/dark mode support
 - 📊 **Response Rate Tracker** — see your interview success rate at a glance
-- 🚧 **Job Automation** — not available yet; `/automation` is a placeholder while
-  the feature is redesigned (see [Automation](#automation--work-in-progress))
+- 🚧 **Job Automation** — not available yet; `/automation` is a placeholder
+  (see [Automation](#automation--work-in-progress))
 
 ---
 
@@ -199,34 +199,15 @@ at runtime.
 ## Automation — work in progress
 
 Automatic job importing is **not currently available**. `/automation` is a
-placeholder while the feature is redesigned.
+placeholder while the feature is designed.
 
-### What was removed, and why
-
-Earlier versions shipped a guide for importing jobs from Remotive via a
-self-hosted [n8n](https://n8n.io) workflow. It has been removed because it could
-never have worked.
-
-The guide told users to authenticate the n8n HTTP node with the Supabase **anon**
-key. Under Row Level Security an anonymous request has no user, so `auth.uid()`
-is `NULL` and the policy check `auth.uid() = user_id` evaluates to `NULL` rather
-than true. Every insert was rejected. Verified against the live database: the only
-policy on `job_applications` is `FOR ALL` with exactly that expression.
-
-The only credentials that satisfy it are a user access token (expires in about an
-hour, useless against a 12-hour schedule) or the `service_role` key, which
-bypasses RLS entirely and can read and write every user's rows. Neither belongs
-in a copy-paste setup guide, so the feature needs redesigning rather than
-patching.
-
-Working-looking instructions that silently import nothing are worse than an
-honest placeholder, so the guide and `public/n8n-workflow-remotive.json` are
-gone. The `/automation` route remains so existing links do not 404.
+Applications are added manually from the dashboard. Everything else — the board,
+AI tools, and stats — is unaffected.
 
 The partial unique index on `(user_id, job_url)` in
-[`supabase/migrations/`](./supabase/migrations) is kept — it still prevents the
-same posting being saved twice by hand, and it correctly excludes `NULL` and `''`
-so applications without a URL are unaffected.
+[`supabase/migrations/`](./supabase/migrations) is retained regardless: it
+prevents the same posting being saved twice by hand, and it excludes `NULL` and
+`''` so applications without a URL are unaffected.
 
 ---
 

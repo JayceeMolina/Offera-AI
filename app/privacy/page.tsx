@@ -45,7 +45,7 @@ export default function PrivacyPage() {
             },
             {
               title: '4. Automation',
-              content: 'Automatic job importing is not currently available. A previous version of this app documented an optional integration with Remotive via a self-hosted n8n workflow; that guide has been removed and the feature is not active. No job data is imported from any third party, and no automated process reads or writes your account. Every application in your dashboard is one you added yourself. If automated importing returns in future, this policy will be updated before it is enabled.',
+              content: 'Automatic job importing is not currently available. No job data is imported from any third party, and no automated process reads or writes your account. Every application in your dashboard is one you added yourself. If automated importing is introduced in future, this policy will be updated before the feature is enabled.',
             },
             {
               title: '5. Data Storage',
@@ -65,7 +65,7 @@ export default function PrivacyPage() {
             },
             {
               title: '9. Third-Party Services',
-              content: 'Offera AI integrates with two third-party services: Supabase (database and authentication) and OpenRouter (AI text generation, which in turn forwards requests to the model provider it selects). Each has its own privacy policy. We share only the minimum data required for each to function. Remotive is no longer used — the automation feature that relied on it has been removed.',
+              content: 'Offera AI integrates with two third-party services: Supabase (database and authentication) and OpenRouter (AI text generation, which in turn forwards requests to the model provider it selects). Each has its own privacy policy. We share only the minimum data required for each to function.',
             },
             {
               title: '10. Changes to This Policy',
