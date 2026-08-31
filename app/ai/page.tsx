@@ -12,23 +12,9 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { useTheme } from 'next-themes'
 import { useInactivityLogout } from '@/lib/useInactivityLogout'
+import { ThemeToggle } from '@/components/theme-toggle'
 
-function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-  if (!mounted) return <div className="w-9 h-9" />
-  return (
-    <button
-      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="w-9 h-9 rounded-lg border border-[#D9D4CB] dark:border-slate-700 flex items-center justify-center hover:bg-[#E8E4DC] dark:hover:bg-slate-800 transition-colors text-base"
-    >
-      {theme === 'dark' ? '☀' : '☾'}
-    </button>
-  )
-}
 
 type Tool = 'cover_letter' | 'interview_questions' | 'resume_bullet'
 

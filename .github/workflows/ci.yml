@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: this workflow only reads the repository. It publishes nothing,
+# comments on nothing, and uses no secrets, which also makes it safe to run on
+# pull requests from forks.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same branch. Pushing twice in quick succession
+# otherwise burns two full runs of the free minutes allowance.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # Actions are pinned to major version tags. For stricter supply-chain
+      # hardening these can be pinned to full commit SHAs; both of these are
+      # GitHub-maintained, which is why tags are considered acceptable here.
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the Dockerfile (node:20-alpine). Next.js 16 requires Node 20+.
+          node-version: '20'
+          cache: 'npm'
+
+      # `npm ci` rather than `npm install`: installs exactly what the lockfile
+      # says and fails if package.json and the lockfile have drifted apart.
+      - name: Install dependencies
+        run: npm ci
+
+      # Cheap checks first so a typo fails in seconds instead of after a build.
+      - name: Lint
+        run: npx eslint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      # Single-run mode. `vitest` alone would start a watcher and hang the job.
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        env:
+          # Next.js inlines NEXT_PUBLIC_* at build time, so the build fails
+          # without them. These are deliberately placeholders, not the real
+          # project values:
+          #
+          #   - No secrets are needed to verify that the app compiles.
+          #   - Using placeholders keeps this workflow safe on fork pull
+          #     requests, where repository secrets are unavailable.
+          #
+          # This step proves the code builds. It does not produce a deployable
+          # artifact -- Vercel builds that separately with the real values.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          NEXT_PUBLIC_SITE_URL: http://localhost:3000
+        run: npm run build
+
+      # Reported, but only fails the build on CRITICAL findings.
+      #
+      # There are currently 3 HIGH advisories, all inside Next.js itself
+      # (its bundled postcss and sharp). They are build-time only and
+      # unreachable in this app -- it uses neither next/image nor Server
+      # Actions -- and clearing them requires a Next.js minor upgrade. Failing
+      # on `high` today would leave CI permanently red, which trains everyone
+      # to ignore it.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=critical

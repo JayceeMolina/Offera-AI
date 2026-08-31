@@ -16,7 +16,8 @@ A full-stack AI-powered job application tracking platform built with Next.js, Ty
 - 🔍 **Search & Filter** — search across all applications instantly
 - 🌙 **Dark Mode** — full light/dark mode support
 - 📊 **Response Rate Tracker** — see your interview success rate at a glance
-- ⚡ **Job Automation** — auto-import remote job listings from Remotive using n8n (self-hosted, free)
+- 🚧 **Job Automation** — not available yet; `/automation` is a placeholder while
+  the feature is redesigned (see [Automation](#automation--work-in-progress))
 
 ---
 
@@ -29,7 +30,8 @@ A full-stack AI-powered job application tracking platform built with Next.js, Ty
 | Auth | Supabase Auth (JWT) |
 | AI | OpenRouter (`openrouter/free` router) |
 | Rate limiting | In-memory, or Upstash Redis when configured |
-| Automation | n8n (self-hosted), Remotive API |
+| Testing | Vitest (70 unit tests) |
+| CI | GitHub Actions — lint, types, tests, build, audit |
 | Containerization | Docker (multi-stage build) |
 | Deployment | Vercel / Docker |
 
@@ -46,8 +48,12 @@ A full-stack AI-powered job application tracking platform built with Next.js, Ty
 - Shared password policy enforced on both signup and reset
 - Input sanitization before the AI call; AI output is rendered as React elements,
   never `dangerouslySetInnerHTML`
+- **Content Security Policy** (enforced) — restricts scripts, styles and network
+  connections to this origin plus Supabase
+- **HSTS** — `max-age=63072000; includeSubDomains`, production only
 - HTTP security headers (clickjacking, MIME sniffing, referrer, permissions)
 - Environment variables kept server-side (`OPENROUTER_API_KEY` is not `NEXT_PUBLIC_`)
+- CI runs lint, type check, tests and build on every push and pull request
 
 ### Known limitations
 
@@ -67,8 +73,19 @@ Being explicit about what these controls do *not* cover:
   from the browser, so nothing client-side can be authoritative. Set the
   authoritative policy in Supabase → Authentication → Policies. Signup differs:
   it goes through our API route, where validation is enforced.
-- **No CSP or HSTS header** is set yet. `X-XSS-Protection` is present but is
-  deprecated and ignored by current browsers.
+- **The CSP allows `'unsafe-inline'` for scripts and styles.** This is measured,
+  not lazy. `next-themes` injects an inline script to set the theme before first
+  paint, Next.js emits inline hydration scripts, and React style props such as
+  the response-rate bar render as inline `style` attributes. The textbook fix is
+  a per-request nonce, but that forces every route to render dynamically and 13
+  of 15 routes are currently statically prerendered. The policy still blocks
+  scripts from any external origin, which is the attack it most needs to stop.
+- **`X-XSS-Protection` has been removed.** It was a non-standard filter that
+  Chrome, Edge and Safari have all deleted and Firefox never shipped. CSP
+  replaces it.
+- **Tests cover `lib/` only.** 70 unit tests across the logic layer. There is no
+  component, integration or end-to-end coverage, so UI regressions are still
+  caught by hand.
 
 ---
 
@@ -119,7 +136,7 @@ Apply it either way:
 
 Every statement is idempotent and non-destructive, so it is safe to run against
 a database that already has data. See [`supabase/README.md`](./supabase/README.md)
-for verification queries and an important note about the n8n importer.
+for verification queries.
 
 ### Run Locally
 
@@ -179,34 +196,79 @@ at runtime.
 
 ---
 
-## Automation (n8n + Remotive)
+## Automation — work in progress
 
-Offera AI includes an optional automation feature that lets users auto-import remote job listings from [Remotive](https://remotive.com) into their dashboard using [n8n](https://n8n.io) (free, self-hosted).
+Automatic job importing is **not currently available**. `/automation` is a
+placeholder while the feature is redesigned.
 
-### How It Works
+### What was removed, and why
 
-1. User runs n8n locally via Docker
-2. Imports the pre-built workflow (`public/n8n-workflow-remotive.json`)
-3. n8n fetches jobs from Remotive on a schedule → filters by keywords → inserts into Supabase
-4. Jobs appear automatically in the user's dashboard
+Earlier versions shipped a guide for importing jobs from Remotive via a
+self-hosted [n8n](https://n8n.io) workflow. It has been removed because it could
+never have worked.
 
-### Key Points
+The guide told users to authenticate the n8n HTTP node with the Supabase **anon**
+key. Under Row Level Security an anonymous request has no user, so `auth.uid()`
+is `NULL` and the policy check `auth.uid() = user_id` evaluates to `NULL` rather
+than true. Every insert was rejected. Verified against the live database: the only
+policy on `job_applications` is `FOR ALL` with exactly that expression.
 
-- **Free** — n8n Community Edition is open-source, Remotive API is public
-- **Private** — runs on the user's own machine, no server-side scraping
-- **Legal** — complies with Remotive ToS (links back to source, personal use only)
-- **No duplicates** — the unique index on `(user_id, job_url)` that makes
-  `Prefer: resolution=ignore-duplicates` work is created by the migration in
-  [`supabase/migrations/`](./supabase/migrations)
+The only credentials that satisfy it are a user access token (expires in about an
+hour, useless against a 12-hour schedule) or the `service_role` key, which
+bypasses RLS entirely and can read and write every user's rows. Neither belongs
+in a copy-paste setup guide, so the feature needs redesigning rather than
+patching.
 
-> **⚠️ This importer does not work as currently documented.** The `/automation`
-> page tells you to authenticate the n8n HTTP node with the **anon** key. Under
-> RLS that can never succeed: for an anon request `auth.uid()` is `NULL`, so the
-> policy check `auth.uid() = user_id` never matches and every insert is
-> rejected. See [`supabase/README.md`](./supabase/README.md) for the options and
-> the security tradeoff of each.
+Working-looking instructions that silently import nothing are worse than an
+honest placeholder, so the guide and `public/n8n-workflow-remotive.json` are
+gone. The `/automation` route remains so existing links do not 404.
 
-Visit the `/automation` page in the app for the full setup guide.
+The partial unique index on `(user_id, job_url)` in
+[`supabase/migrations/`](./supabase/migrations) is kept — it still prevents the
+same posting being saved twice by hand, and it correctly excludes `NULL` and `''`
+so applications without a URL are unaffected.
+
+---
+
+## Testing
+
+```bash
+npm test          # single run
+npm run test:watch
+```
+
+70 unit tests with [Vitest](https://vitest.dev) across the logic layer:
+
+| File | Covers |
+|---|---|
+| `lib/password.test.ts` | the 5 policy rules, length bounds, type handling |
+| `lib/jobs.test.ts` | payload building, drafts, search, response rate |
+| `lib/sanitize.test.ts` | prompt vs HTML sanitisation |
+| `lib/ratelimit.test.ts` | client IP parsing, fixed-window limits, lockout |
+
+Several are explicit regression guards for bugs that actually shipped — an empty
+`job_url` becoming `NULL` (which the database index must accommodate), the
+default applied date being fixed at module load, and `x-forwarded-for` being used
+raw as a rate-limit key.
+
+No network, no database, and no DOM: every test is a pure function call.
+
+## Continuous Integration
+
+[`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs on every push to
+`main` and every pull request:
+
+```
+npm ci  →  eslint  →  tsc --noEmit  →  npm test  →  npm run build  →  npm audit
+```
+
+- `permissions: contents: read` and **no secrets**, so it is safe on fork pull
+  requests
+- The build step uses placeholder `NEXT_PUBLIC_*` values — it proves the app
+  compiles, it does not produce a deployable artifact
+- `npm audit` fails only on **critical** findings. Three high advisories exist
+  inside Next.js itself (bundled `postcss` and `sharp`); they are build-time only
+  and unreachable here, and failing on them would leave CI permanently red
 
 ---
 
@@ -218,29 +280,35 @@ Visit the `/automation` page in the app for the full setup guide.
     │   │   ├── ai/            # AI route (OpenRouter), JWT-verified + rate limited
     │   │   └── auth/          # login, signup, reset-password — all rate limited
     │   ├── auth/callback/     # Exchanges email link code for a session
-    │   ├── automation/        # n8n automation setup guide
+    │   ├── automation/        # Placeholder — feature being redesigned
     │   ├── dashboard/         # Main board / list dashboard
     │   ├── ai/                # AI tools page
     │   ├── login/             # Login + signup
     │   ├── reset-password/    # Set a new password
+    │   ├── privacy/           # Privacy policy
     │   └── page.tsx           # Landing page
+    ├── components/
+    │   ├── theme-toggle.tsx   # Shared dark-mode button
+    │   └── ui/                # shadcn primitives
     ├── lib/
     │   ├── supabase.ts        # Supabase browser client
     │   ├── jobs.ts            # Typed, error-checked job_applications data layer
     │   ├── password.ts        # Shared password policy
     │   ├── ratelimit.ts       # Rate limiting (in-memory or Upstash)
     │   ├── sanitize.ts        # Input sanitization
-    │   └── useInactivityLogout.ts  # Inactivity logout (see limitations)
+    │   ├── useInactivityLogout.ts  # Inactivity logout (see limitations)
+    │   └── *.test.ts          # 70 Vitest unit tests
     ├── supabase/
     │   ├── migrations/        # Schema + RLS policies (source of truth)
-    │   └── README.md          # How to apply, and the n8n caveat
-    ├── public/
-    │   └── n8n-workflow-remotive.json  # Pre-built n8n workflow
+    │   └── README.md          # How to apply
+    ├── .github/workflows/
+    │   └── ci.yml             # Lint, types, tests, build, audit
     ├── proxy.ts               # Route guard (was middleware.ts — renamed in Next 16)
     ├── Dockerfile             # Multi-stage production build
     ├── docker-compose.yml     # Local Docker development
+    ├── vitest.config.mts      # Test config
     ├── .env.example           # Documented environment template
-    └── next.config.ts         # Security headers + standalone output
+    └── next.config.ts         # CSP, HSTS, security headers + standalone output
 
 ---
 
