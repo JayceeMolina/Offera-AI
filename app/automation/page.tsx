@@ -175,9 +175,15 @@ export default function AutomationPage() {
             <p className="text-sm text-[#7A7068] dark:text-slate-400">
               Go to your <strong>Supabase Dashboard → SQL Editor</strong> and run this once. It prevents the same job from being added twice:
             </p>
-            <CodeBlock>{`CREATE UNIQUE INDEX IF NOT EXISTS idx_job_applications_url
+            <CodeBlock>{`CREATE UNIQUE INDEX IF NOT EXISTS job_applications_user_job_url_key
 ON job_applications (user_id, job_url)
-WHERE job_url IS NOT NULL AND job_url != '';`}</CodeBlock>
+WHERE job_url IS NOT NULL AND job_url <> '';`}</CodeBlock>
+            <p className="text-xs text-[#A8A099] dark:text-slate-500">
+              This is the same index created by{' '}
+              <span className="font-mono">supabase/migrations/</span> — the names match
+              deliberately, so running both does not leave you with two overlapping
+              unique indexes on the same columns.
+            </p>
           </div>
 
           {/* STEP 4 */}

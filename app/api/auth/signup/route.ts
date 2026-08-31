@@ -13,18 +13,17 @@ import { createClient } from '@supabase/supabase-js'
 export async function POST(request: NextRequest) {
   const ip = clientIp(request)
 
-  // Max 3 signups per hour per IP
-  const { success } = await rateLimit(ip, 3, 60 * 60 * 1000)
-  if (!success) {
-    return NextResponse.json(
-      { error: 'Too many signup attempts. Please wait an hour before trying again.' },
-      { status: 429 }
-    )
+  // Guarded parse: previously a malformed body threw and returned 500.
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 })
   }
 
-  const { email, password } = await request.json()
+  const { email, password } = (body ?? {}) as { email?: unknown; password?: unknown }
 
-  if (!email || !password) {
+  if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
     return NextResponse.json({ error: 'Missing email or password' }, { status: 400 })
   }
 
@@ -32,6 +31,21 @@ export async function POST(request: NextRequest) {
   const passwordError = validatePassword(password)
   if (passwordError) {
     return NextResponse.json({ error: passwordError }, { status: 400 })
+  }
+
+  // Rate limit AFTER validation, and only 3 per hour, because each success
+  // sends an email.
+  //
+  // The limiter used to run first, so a rejected request still consumed a slot:
+  // three password typos, or three malformed requests, locked a user out of
+  // signing up for a full hour. Only requests that can actually cause an email
+  // should count against an email-sending budget.
+  const { success } = await rateLimit(ip, 3, 60 * 60 * 1000)
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Too many signup attempts. Please wait an hour before trying again.' },
+      { status: 429 }
+    )
   }
 
   const supabase = createClient(
@@ -71,7 +85,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    return NextResponse.json({ error: error.message }, { status: 400 })
+
+    // Anything else is logged rather than forwarded. Supabase messages here can
+    // describe project configuration or connectivity state, which is not useful
+    // to the user and should not be exposed.
+    console.error('[signup] sign-up failed:', error.message)
+    return NextResponse.json(
+      { error: 'Could not create the account. Please check your details and try again.' },
+      { status: 400 }
+    )
   }
 
   // Supabase sometimes returns a user with identities=[] for duplicate emails

@@ -238,7 +238,13 @@ export default function DashboardPage() {
     return () => window.removeEventListener('keydown', handleKey)
   }, [showNewJobModal])
 
-  const fetchJobs = async () => {
+  // Declared as a hoisted `function` rather than a `const` arrow because the
+  // mount effect above calls it before this point in the source. As a const it
+  // sat in the temporal dead zone at that line, which ESLint reported as
+  // "Cannot access variable before it is declared". It worked at runtime only
+  // because effects run after render completes -- the lint error was pointing at
+  // a genuine fragility, not a false positive.
+  async function fetchJobs() {
     const { data, error: loadError } = await listJobs(supabase)
 
     if (loadError !== null) {
@@ -325,7 +331,9 @@ export default function DashboardPage() {
     setError(null)
   }
 
-  const closeNewJobModal = () => {
+  // Hoisted for the same reason as fetchJobs: the Escape-key effect above
+  // references it before this line.
+  function closeNewJobModal() {
     setShowNewJobModal(false)
     setNewJob(emptyJobDraft())
   }

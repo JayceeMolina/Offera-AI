@@ -41,6 +41,12 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  // Tracked explicitly rather than inferred from the message text. The banner
+  // used to decide its colour with message.includes('Check') || includes('sent'),
+  // which silently mis-styled any wording that did not happen to contain those
+  // words -- including the reset confirmation, which reads "...a reset link is on
+  // its way." and was therefore shown to the user in red as if it had failed.
+  const [isError, setIsError] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showChecks, setShowChecks] = useState(false)
   const router = useRouter()
@@ -48,56 +54,94 @@ export default function LoginPage() {
 
   const strength = getPasswordStrength(password)
 
+  const notify = (text: string, failed: boolean) => {
+    setMessage(text)
+    setIsError(failed)
+  }
+
   const handleAuth = async () => {
     setLoading(true)
     setMessage('')
+    setIsError(false)
 
     if (isSignUp) {
       // Client-side pre-check for fast feedback. The API route re-validates
       // with the same shared policy, which is where enforcement actually is.
       if (!strength.valid) {
-        setMessage('Please meet all password requirements before continuing.')
+        notify('Please meet all password requirements before continuing.', true)
         setShowChecks(true)
         setLoading(false)
         return
       }
 
-      const res = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      })
-      const data = await res.json()
-      if (!res.ok) setMessage(data.error || 'Signup failed. Please try again.')
-      else setMessage('Check your email for a confirmation link!')
-      setLoading(false)
+      try {
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
+        const data = await res.json()
+        if (!res.ok) notify(data.error || 'Signup failed. Please try again.', true)
+        else notify('Check your email for a confirmation link!', false)
+      } catch {
+        notify('Could not reach the server. Please check your connection.', true)
+      } finally {
+        setLoading(false)
+      }
       return
     }
 
     // Login
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    })
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
 
-    const data = await res.json()
+      const data = await res.json()
 
-    if (!res.ok) {
-      setMessage(data.error || 'Login failed. Please try again.')
-    } else {
-      await supabase.auth.setSession(data.session)
+      if (!res.ok) {
+        notify(data.error || 'Login failed. Please try again.', true)
+        setLoading(false)
+        return
+      }
+
+      // Establishing the session can fail (malformed or already-expired tokens).
+      // It used to be awaited without checking, so a failure still navigated to
+      // /dashboard, where the auth guard bounced the user straight back to
+      // /login with no explanation of what went wrong.
+      const { error: sessionError } = await supabase.auth.setSession(data.session)
+
+      if (sessionError) {
+        console.error('[login] setSession failed:', sessionError.message)
+        notify('Could not start your session. Please try again.', true)
+        setLoading(false)
+        return
+      }
+
+      // NOTE: the 100ms delay is retained deliberately. It exists to let the
+      // session cookies written by setSession() land before proxy.ts reads them
+      // on the next request. Removing it is very likely safe now that
+      // setSession is awaited and its result checked, but that cannot be
+      // verified without a live login against real Supabase credentials, so it
+      // is left alone here and reported instead of changed on a guess.
+      //
+      // `loading` stays true through the navigation so the button does not
+      // briefly re-enable.
       setTimeout(() => { router.replace('/dashboard') }, 100)
+    } catch {
+      notify('Could not reach the server. Please check your connection.', true)
+      setLoading(false)
     }
-
-    setLoading(false)
   }
 
   const handleForgotPassword = async () => {
-    if (!email) { setMessage('Enter your email first.'); return }
+    if (!email) { notify('Enter your email first.', true); return }
 
     setLoading(true)
     setMessage('')
+    setIsError(false)
 
     // Goes through a rate-limited API route rather than calling Supabase
     // directly from the browser, so this email trigger cannot be hit in a loop.
@@ -111,11 +155,14 @@ export default function LoginPage() {
 
       // The route deliberately returns the same message whether or not the
       // address is registered, to avoid confirming which emails have accounts.
-      setMessage(res.ok
-        ? data.message ?? 'If an account exists for that email, a reset link is on its way.'
-        : data.error ?? 'Could not send the reset email. Please try again.')
+      notify(
+        res.ok
+          ? data.message ?? 'If an account exists for that email, a reset link is on its way.'
+          : data.error ?? 'Could not send the reset email. Please try again.',
+        !res.ok,
+      )
     } catch {
-      setMessage('Could not reach the server. Please check your connection.')
+      notify('Could not reach the server. Please check your connection.', true)
     } finally {
       setLoading(false)
     }
@@ -127,7 +174,6 @@ export default function LoginPage() {
       {/* NAVBAR */}
       <nav className="border-b border-[#E2DDD6] dark:border-slate-800 bg-[#F8F6F2] dark:bg-slate-900 px-6 py-3 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <span className="text-xl"> </span>
           <span className="font-bold text-base tracking-tight text-[#8B3A2A] dark:text-slate-100">Offera AI</span>
         </Link>
         <ThemeToggle />
@@ -236,11 +282,15 @@ export default function LoginPage() {
 
             {/* MESSAGE */}
             {message && (
-              <div className={`text-sm text-center px-4 py-2.5 rounded-lg ${
-                message.includes('Check') || message.includes('sent')
-                  ? 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
-                  : 'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
-              }`}>
+              <div
+                role={isError ? 'alert' : 'status'}
+                aria-live="polite"
+                className={`text-sm text-center px-4 py-2.5 rounded-lg ${
+                  isError
+                    ? 'bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800'
+                    : 'bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800'
+                }`}
+              >
                 {message}
               </div>
             )}
@@ -262,6 +312,7 @@ export default function LoginPage() {
                 onClick={() => {
                   setIsSignUp(!isSignUp)
                   setMessage('')
+                  setIsError(false)
                   setShowChecks(false)
                   setPassword('')
                 }}
@@ -275,9 +326,9 @@ export default function LoginPage() {
           {/* PRIVACY POLICY */}
           <p className="text-center text-xs text-[#A8A099] dark:text-slate-500">
             By continuing, you agree to our{' '}
-            <a href="/privacy" className="text-[#8B3A2A] dark:text-indigo-400 hover:underline">
+            <Link href="/privacy" className="text-[#8B3A2A] dark:text-indigo-400 hover:underline">
               Privacy Policy
-            </a>
+            </Link>
           </p>
 
         </div>

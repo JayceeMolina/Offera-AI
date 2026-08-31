@@ -1,13 +1,14 @@
 // RESET PASSWORD PAGE
 //
-// Where the user lands after clicking the reset link in their email — now via
-// /auth/callback, which exchanges the one-time code for a real session first.
+// Where the user lands after clicking the reset link in their email. Supabase
+// redirects here directly, with the recovery session in the URL fragment; see
+// the effect below for how it is consumed and why.
 //
 // Two problems this page previously had:
 //
-//   1. It assumed a session existed. Under the PKCE flow nothing had exchanged
-//      the code, so supabase.auth.updateUser() failed with "Auth session
-//      missing". It detected only the narrow case where Supabase had put
+//   1. It assumed a session already existed and never established one, so
+//      supabase.auth.updateUser() failed with "Auth session missing". It
+//      detected only the narrow case where Supabase had put
 //      `error=access_denied` in the URL, and otherwise showed a working-looking
 //      form that could not succeed.
 //
